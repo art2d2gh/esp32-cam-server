@@ -10,6 +10,9 @@ require('dotenv').config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Trust proxy for deployment platforms
+app.set('trust proxy', 1);
+
 // Supabase connection (with fallback for testing)
 let supabase = null;
 try {
