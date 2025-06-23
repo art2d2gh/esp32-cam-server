@@ -30,7 +30,18 @@ app.use(helmet());
 app.use(compression());
 app.use(cors());
 app.use(morgan('combined'));
-app.use(express.json({ limit: '10mb' }));
+
+// Parse JSON for most endpoints
+app.use('/api', (req, res, next) => {
+  if (req.path === '/stream') {
+    // For /api/stream, parse as raw buffer
+    express.raw({ type: '*/*', limit: '10mb' })(req, res, next);
+  } else {
+    // For other endpoints, parse as JSON
+    express.json({ limit: '10mb' })(req, res, next);
+  }
+});
+
 app.use(express.static('public')); // Serve static files
 
 // Configure multer for handling video frames
@@ -168,8 +179,24 @@ app.get('/', (req, res) => {
 app.post('/api/stream', upload.single('frame'), async (req, res) => {
   try {
     const deviceId = req.headers['x-device-id'] || 'unknown';
-    const frameData = req.file ? req.file.buffer : req.body;
-    
+
+    let frameData;
+
+    // Handle different ways frame data can be sent
+    if (req.file && req.file.buffer) {
+      // Multipart form data (from real ESP32-CAM)
+      frameData = req.file.buffer;
+    } else if (Buffer.isBuffer(req.body)) {
+      // Raw buffer data (from test simulator)
+      frameData = req.body;
+    } else if (req.body && typeof req.body === 'object' && req.body.type === 'Buffer') {
+      // Buffer sent as JSON (from test simulator)
+      frameData = Buffer.from(req.body.data || req.body);
+    } else {
+      // Try to convert whatever we got to a buffer
+      frameData = Buffer.from(req.body || '');
+    }
+
     if (!frameData || frameData.length === 0) {
       return res.status(400).json({ error: 'No frame data received' });
     }
