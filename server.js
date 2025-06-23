@@ -46,7 +46,17 @@ app.use('/api', (req, res, next) => {
   }
 });
 
-app.use(express.static('public')); // Serve static files
+// Serve static files
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Explicit routes for static files (Vercel compatibility)
+app.get('/style.css', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'style.css'));
+});
+
+app.get('/app.js', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'app.js'));
+});
 
 // Configure multer for handling video frames
 const storage = multer.memoryStorage();
