@@ -4,6 +4,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const multer = require('multer');
+const path = require('path');
 const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
@@ -169,13 +170,19 @@ async function getFrameHistory(deviceId, limit = 50) {
 
 // Routes
 
-// Health check
+// Serve web interface
 app.get('/', (req, res) => {
-  res.json({
-    status: 'ESP32-CAM Server Running',
-    timestamp: new Date().toISOString(),
-    connectedDevices: deviceStatus.size
-  });
+  // Check if request accepts HTML (browser request)
+  if (req.headers.accept && req.headers.accept.includes('text/html')) {
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  } else {
+    // API request - return JSON status
+    res.json({
+      status: 'ESP32-CAM Server Running',
+      timestamp: new Date().toISOString(),
+      connectedDevices: deviceStatus.size
+    });
+  }
 });
 
 // Receive video frames from ESP32-CAM

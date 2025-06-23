@@ -9,7 +9,7 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 
-const SERVER_URL = 'http://localhost:3000';
+const SERVER_URL = 'https://esp32-cam-server.vercel.app';
 const DEVICE_ID = 'test_esp32_cam_001';
 
 class ESP32CamSimulator {
