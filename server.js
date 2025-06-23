@@ -4,17 +4,26 @@ const helmet = require('helmet');
 const compression = require('compression');
 const morgan = require('morgan');
 const multer = require('multer');
-const { Pool } = require('pg');
+const { createClient } = require('@supabase/supabase-js');
 require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Database connection
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+// Supabase connection (with fallback for testing)
+let supabase = null;
+try {
+  if (process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY &&
+      process.env.SUPABASE_ANON_KEY !== 'your_anon_key_here') {
+    supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_ANON_KEY);
+    console.log('✅ Supabase connection configured');
+  } else {
+    console.log('⚠️  No Supabase configured - running in memory-only mode');
+  }
+} catch (error) {
+  console.log('⚠️  Supabase connection failed - running in memory-only mode');
+  supabase = null;
+}
 
 // Middleware
 app.use(helmet());
@@ -34,6 +43,9 @@ const upload = multer({
 // Device status storage (in-memory for now)
 const deviceStatus = new Map();
 
+// In-memory frame storage (fallback when no database)
+const frameStorage = new Map();
+
 // Utility function to log with timestamp
 function log(message) {
   const timestamp = new Date().toISOString();
@@ -43,14 +55,47 @@ function log(message) {
 // Database helper functions
 async function saveFrame(deviceId, frameData, metadata = {}) {
   try {
-    const query = `
-      INSERT INTO video_frames (device_id, frame_data, size, metadata, created_at)
-      VALUES ($1, $2, $3, $4, NOW())
-      RETURNING id, created_at
-    `;
-    const values = [deviceId, frameData, frameData.length, JSON.stringify(metadata)];
-    const result = await pool.query(query, values);
-    return result.rows[0];
+    if (supabase) {
+      // Save to Supabase
+      const { data, error } = await supabase
+        .from('video_frames')
+        .insert({
+          device_id: deviceId,
+          frame_data: frameData.toString('base64'), // Convert buffer to base64
+          size: frameData.length,
+          metadata: metadata
+        })
+        .select('id, created_at')
+        .single();
+
+      if (error) throw error;
+      return data;
+    } else {
+      // Save to memory
+      const frameId = Date.now();
+      const frame = {
+        id: frameId,
+        device_id: deviceId,
+        frame_data: frameData,
+        size: frameData.length,
+        metadata: metadata,
+        created_at: new Date().toISOString()
+      };
+
+      if (!frameStorage.has(deviceId)) {
+        frameStorage.set(deviceId, []);
+      }
+
+      const deviceFrames = frameStorage.get(deviceId);
+      deviceFrames.push(frame);
+
+      // Keep only last 50 frames per device
+      if (deviceFrames.length > 50) {
+        deviceFrames.shift();
+      }
+
+      return { id: frameId, created_at: frame.created_at };
+    }
   } catch (error) {
     log(`Error saving frame: ${error.message}`);
     throw error;
@@ -59,15 +104,32 @@ async function saveFrame(deviceId, frameData, metadata = {}) {
 
 async function getLatestFrame(deviceId) {
   try {
-    const query = `
-      SELECT id, device_id, frame_data, size, metadata, created_at
-      FROM video_frames
-      WHERE device_id = $1
-      ORDER BY created_at DESC
-      LIMIT 1
-    `;
-    const result = await pool.query(query, [deviceId]);
-    return result.rows[0];
+    if (supabase) {
+      // Get from Supabase
+      const { data, error } = await supabase
+        .from('video_frames')
+        .select('id, device_id, frame_data, size, metadata, created_at')
+        .eq('device_id', deviceId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
+
+      if (data && data.frame_data) {
+        // Convert base64 back to buffer
+        data.frame_data = Buffer.from(data.frame_data, 'base64');
+      }
+
+      return data;
+    } else {
+      // Get from memory
+      const deviceFrames = frameStorage.get(deviceId);
+      if (deviceFrames && deviceFrames.length > 0) {
+        return deviceFrames[deviceFrames.length - 1];
+      }
+      return null;
+    }
   } catch (error) {
     log(`Error getting latest frame: ${error.message}`);
     throw error;
