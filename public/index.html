@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ESP32-CAM Remote Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>ESP32-CAM Remote Control</h1>
+            <div class="status-bar">
+                <span id="connection-status" class="status offline">Disconnected</span>
+                <span id="server-time"></span>
+            </div>
+        </header>
+
+        <main>
+            <div class="video-section">
+                <div class="video-container">
+                    <img id="video-stream" src="" alt="ESP32-CAM Stream" />
+                    <div id="video-overlay" class="overlay">
+                        <div class="loading-spinner"></div>
+                        <p>Waiting for video stream...</p>
+                    </div>
+                </div>
+                
+                <div class="video-controls">
+                    <button id="refresh-btn" class="btn btn-secondary">Refresh Stream</button>
+                    <span id="frame-info">No frames received</span>
+                </div>
+            </div>
+
+            <div class="control-section">
+                <div class="device-selector">
+                    <label for="device-select">Select Device:</label>
+                    <select id="device-select">
+                        <option value="">No devices found</option>
+                    </select>
+                    <button id="refresh-devices-btn" class="btn btn-small">Refresh</button>
+                </div>
+
+                <div class="camera-controls">
+                    <h3>Camera Controls</h3>
+                    <div class="control-group">
+                        <button id="camera-on-btn" class="btn btn-success">Turn Camera ON</button>
+                        <button id="camera-off-btn" class="btn btn-danger">Turn Camera OFF</button>
+                    </div>
+                    <div class="control-group">
+                        <button id="start-stream-btn" class="btn btn-primary">Start Streaming</button>
+                        <button id="stop-stream-btn" class="btn btn-warning">Stop Streaming</button>
+                    </div>
+                </div>
+
+                <div class="device-status">
+                    <h3>Device Status</h3>
+                    <div id="device-info">
+                        <p>Select a device to view status</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="logs-section">
+                <h3>Activity Log</h3>
+                <div id="activity-log" class="log-container">
+                    <p class="log-entry">Server started - waiting for activity...</p>
+                </div>
+                <button id="clear-log-btn" class="btn btn-small">Clear Log</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
